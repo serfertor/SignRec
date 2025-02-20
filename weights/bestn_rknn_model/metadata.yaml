@@ -1,0 +1,27 @@
+description: Ultralytics YOLO11n model trained on /kaggle/working/Signs-3/data.yaml
+author: Ultralytics
+date: '2025-02-19T18:33:00.553628'
+version: 8.3.77
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+batch: 1
+imgsz:
+- 640
+- 640
+names:
+  0: bad
+  1: down
+  2: goat
+  3: good
+  4: heart
+  5: jumbo
+  6: ok
+  7: paper
+  8: rock
+  9: scissors
+  10: up
+args:
+  batch: 1
+  name: rk3588
