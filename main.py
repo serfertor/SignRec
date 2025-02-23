@@ -45,7 +45,7 @@ def detect_and_track(color_frame, depth_frame):
     current_time = time.time()
     if current_time - last_inference_time >= 1:  # Инференс раз в секунду
         last_inference_time = current_time
-        results = model(color_frame)
+        results = model(cv2.resize(color_frame, (640, 640)))
 
         hands = []
         for result in results:
@@ -139,7 +139,7 @@ def get_frames():
     depth_data = (np.frombuffer(depth_frame.get_data().copy(order='C'), dtype=np.uint16).copy(order='C')
                   .reshape((depth_frame.get_height(), depth_frame.get_width())))
 
-    return cv2.resize(color_image, (640, 640)), depth_data
+    return color_image, depth_data
 
 
 def visualize_depth(depth_frame):
