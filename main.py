@@ -124,7 +124,7 @@ def detect_and_track(color_frame, depth_frame):
 
 
 def get_frames():
-    frames: FrameSet = pipeline.wait_for_frames(2000)
+    frames: FrameSet = pipeline.wait_for_frames(500)
     if frames is None:
         return None, None
 
