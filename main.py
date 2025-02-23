@@ -139,7 +139,7 @@ def get_frames():
     depth_data = (np.frombuffer(depth_frame.get_data().copy(order='C'), dtype=np.uint16).copy(order='C')
                   .reshape((depth_frame.get_height(), depth_frame.get_width())))
 
-    return color_image, depth_data
+    return cv2.resize(color_image, (640, 640)), depth_data
 
 
 def visualize_depth(depth_frame):
