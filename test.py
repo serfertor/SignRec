@@ -126,7 +126,7 @@ def detect_and_track(color_frame, depth_frame):
 
 def get_frames():
     """Получение RGB и глубинного кадра с камеры."""
-    frames: FrameSet = pipeline.wait_for_frames(100)
+    frames: FrameSet = pipeline.wait_for_frames(2000)
     if frames is None:
         return None, None
 
