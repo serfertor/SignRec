@@ -23,7 +23,7 @@ config.set_align_mode(OBAlignMode.HW_MODE)
 pipeline.enable_frame_sync()
 pipeline.start(config)
 
-time.sleep(2)
+#time.sleep(2)
 
 model = YOLO("weights/bestn_rknn_model/bestn_rknn_model")  #bestn (nano) или best (small)
 
@@ -100,6 +100,8 @@ def detect_and_track(color_frame):
                     tracked_trajectory = []
                     last_tracked_bbox = None
                     last_tracked_trajectory = []
+    else:
+        return color_frame
 
     if last_tracked_bbox:
         x1, y1, x2, y2 = last_tracked_bbox
@@ -114,7 +116,7 @@ def detect_and_track(color_frame):
 
 def get_frames():
     print("⏳ Ожидание кадров от камеры...")
-    frames: FrameSet = pipeline.wait_for_frames(300)
+    frames: FrameSet = pipeline.wait_for_frames(100)
     print("✅ Кадры получены!")
     if frames is None:
         return None, None
