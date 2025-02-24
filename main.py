@@ -25,6 +25,7 @@ print(f"Depth profile: {depth_profile.get_width()}x{depth_profile.get_height()} 
 config.set_align_mode(OBAlignMode.HW_MODE)
 pipeline.enable_frame_sync()
 pipeline.start(config)
+time.sleep(2)
 
 model = YOLO("weights/bestn_rknn_model/bestn_rknn_model")  #bestn (nano) или best (small)
 
@@ -124,7 +125,7 @@ def detect_and_track(color_frame, depth_frame):
 
 
 def get_frames():
-    frames: FrameSet = pipeline.wait_for_frames(500)
+    frames: FrameSet = pipeline.wait_for_frames(100)
     if frames is None:
         return None, None
 
