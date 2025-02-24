@@ -125,7 +125,7 @@ def detect_and_track(color_frame, depth_frame):
 
 
 def get_frames():
-    frames: FrameSet = pipeline.wait_for_frames(100)
+    frames: FrameSet = pipeline.wait_for_frames(300)
     if frames is None:
         return None, None
 
@@ -162,6 +162,8 @@ while True:
     cv2.imshow('Sign Recognition', combined_view)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
+        pipeline.stop()
+        cv2.destroyAllWindows()
         break
 
 pipeline.stop()
