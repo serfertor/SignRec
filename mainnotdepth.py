@@ -19,10 +19,10 @@ config.enable_stream(color_profile)
 
 # Включаем синхронизацию кадров (попробуем уменьшить задержку)
 config.set_align_mode(pyorbbecsdk.OBAlignMode.HW_MODE)
-config.set_frame_sync(True)
 
 # Запуск камеры
 pipeline.start(config)
+pipeline.enable_frame_sync()
 
 # Загрузка RKNN модели YOLO
 model = YOLO("weights/bestn_rknn_model/bestn_rknn_model")
