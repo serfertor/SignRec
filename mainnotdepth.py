@@ -18,7 +18,7 @@ color_profile = pipeline.get_stream_profile_list(OBSensorType.COLOR_SENSOR).get_
 config.enable_stream(color_profile)
 
 # Включаем синхронизацию кадров (попробуем уменьшить задержку)
-config.set_align_mode(pyorbbecsdk.AlignMode.OB_ALIGN_D2C_HW_MODE)
+config.set_align_mode(pyorbbecsdk.OBAlignMode.OB_ALIGN_D2C_HW_MODE)
 config.set_frame_sync(True)
 
 # Запуск камеры
