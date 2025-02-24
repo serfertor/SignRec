@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
-import pyorbbecsdk
 import time
+import pyorbbecsdk
 from pyorbbecsdk import Pipeline, Config, OBSensorType
 from utils import frame_to_bgr_image
 
@@ -21,8 +21,9 @@ config.enable_stream(color_profile)
 # Запускаем поток
 pipeline.start(config)
 
+prev_time = time.time()
 frame_count = 0
-start_time = time.time()
+fps = 0
 
 while True:
     frames = pipeline.wait_for_frames(100)  # Ожидание кадров (таймаут 100 мс)
@@ -38,13 +39,23 @@ while True:
     # Конвертация кадра в OpenCV формат (BGR)
     color_image = frame_to_bgr_image(color_frame)
 
-    # Подсчёт FPS
+    # Вычисление FPS
     frame_count += 1
-    elapsed_time = time.time() - start_time
-    if elapsed_time > 1:
-        print(f"FPS: {frame_count / elapsed_time:.2f}")
+    current_time = time.time()
+    elapsed_time = current_time - prev_time
+    if elapsed_time > 1.0:
+        fps = frame_count / elapsed_time
         frame_count = 0
-        start_time = time.time()
+        prev_time = current_time
+
+    # Отображение FPS
+    cv2.putText(color_image, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+    # Рисуем прямоугольник в центре кадра
+    height, width, _ = color_image.shape
+    x1, y1 = width // 4, height // 4
+    x2, y2 = 3 * width // 4, 3 * height // 4
+    cv2.rectangle(color_image, (x1, y1), (x2, y2), (255, 0, 0), 2)
 
     # Отображение кадра
     cv2.imshow("Color Frame", color_image)
