@@ -25,8 +25,13 @@ model = YOLO("weights/bestn_rknn_model/bestn_rknn_model")  # bestn (nano) или
 
 # Таймер для инференса (1 кадр в секунду)
 last_inference_time = 0
+yolo_result = None  # Последний результат инференса
 
 while True:
+    # Чистим буфер перед запросом нового кадра
+    while pipeline.poll_for_frames():
+        pipeline.wait_for_frames(10)
+
     frames = pipeline.wait_for_frames(100)
     if frames is None:
         print("Ошибка: Не получены кадры")
@@ -44,10 +49,12 @@ while True:
     current_time = time.time()
     if current_time - last_inference_time >= 1:
         last_inference_time = current_time
-        results = model(cv2.resize(color_image, (640, 640)))
+        resized_image = cv2.resize(color_image, (640, 640))
+        yolo_result = model(resized_image)
 
-        # Отрисовка боксов
-        for result in results:
+    # Если есть детекции, рисуем боксы
+    if yolo_result:
+        for result in yolo_result:
             for box in result.boxes:
                 x1, y1, x2, y2 = map(int, box.xyxy[0])
                 label = model.names[int(box.cls)]
