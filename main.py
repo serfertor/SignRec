@@ -23,8 +23,10 @@ print(f"Color profile: {color_profile.get_width()}x{color_profile.get_height()} 
 print(f"Depth profile: {depth_profile.get_width()}x{depth_profile.get_height()} @ {depth_profile.get_fps()} FPS")
 
 config.set_align_mode(OBAlignMode.HW_MODE)
-pipeline.enable_frame_sync()
+#pipeline.enable_frame_sync()
+pipeline.disable_frame_sync()
 pipeline.start(config)
+
 time.sleep(2)
 
 model = YOLO("weights/bestn_rknn_model/bestn_rknn_model")  #bestn (nano) или best (small)
