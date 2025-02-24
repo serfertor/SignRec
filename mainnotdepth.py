@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import pyorbbecsdk
 from pyorbbecsdk import Pipeline, Config, OBSensorType
+from utils import frame_to_bgr_image
 
 # Создаём объект пайплайна
 pipeline = Pipeline()
@@ -31,8 +32,7 @@ while True:
         continue
 
     # Конвертация кадра в OpenCV формат (BGR)
-    color_image = np.frombuffer(color_frame.get_data(), dtype=np.uint8)
-    color_image = color_image.reshape((color_frame.get_height(), color_frame.get_width(), 3))
+    color_image = frame_to_bgr_image(color_frame)
 
     # Отображение кадра
     cv2.imshow("Color Frame", color_image)
