@@ -17,21 +17,21 @@ config = Config()
 color_profile = pipeline.get_stream_profile_list(OBSensorType.COLOR_SENSOR).get_default_video_stream_profile()
 config.enable_stream(color_profile)
 
+# Включаем синхронизацию кадров (попробуем уменьшить задержку)
+config.set_align_mode(pyorbbecsdk.AlignMode.OB_ALIGN_D2C_HW_MODE)
+config.set_frame_sync(True)
+
 # Запуск камеры
 pipeline.start(config)
 
 # Загрузка RKNN модели YOLO
-model = YOLO("weights/bestn_rknn_model/bestn_rknn_model")  # bestn (nano) или best (small)
+model = YOLO("weights/bestn_rknn_model/bestn_rknn_model")
 
 # Таймер для инференса (1 кадр в секунду)
 last_inference_time = 0
 yolo_result = None  # Последний результат инференса
 
 while True:
-    # Чистим буфер перед запросом нового кадра
-    while pipeline.poll_for_frames():
-        pipeline.wait_for_frames(10)
-
     frames = pipeline.wait_for_frames(100)
     if frames is None:
         print("Ошибка: Не получены кадры")
