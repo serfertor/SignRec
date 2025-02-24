@@ -132,7 +132,7 @@ while True:
     color_frame = get_frames()
     print("✅ Кадры получены!")
 
-    if color_frame is None or depth_frame is None:
+    if color_frame is None:
         print("⚠️ Кадры не получены, продолжаем ожидание...")
         continue
 
