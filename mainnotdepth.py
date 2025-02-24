@@ -21,7 +21,7 @@ config.enable_stream(color_profile)
 pipeline.start(config)
 
 while True:
-    frames = pipeline.wait_for_frames(300)  # Ожидание кадров (таймаут 1 сек)
+    frames = pipeline.wait_for_frames(100)  # Ожидание кадров (таймаут 1 сек)
     if frames is None:
         print("Ошибка: Не получены кадры")
         continue
