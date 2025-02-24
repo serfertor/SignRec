@@ -32,7 +32,7 @@ last_inference_time = 0
 yolo_result = None  # Последний результат инференса
 
 while True:
-    frames = pipeline.wait_for_frames(100)
+    frames = pipeline.wait_for_frames(300)
     if frames is None:
         print("Ошибка: Не получены кадры")
         continue
