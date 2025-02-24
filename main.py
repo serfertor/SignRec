@@ -44,7 +44,7 @@ def detect_and_track(color_frame, depth_frame):
     global tracked_hand, tracked_trajectory, last_inference_time, missed_frames, last_tracked_bbox, last_tracked_trajectory
 
     current_time = time.time()
-    if current_time - last_inference_time >= 1:  # Инференс раз в секунду
+    if current_time - last_inference_time >= 5:  # Инференс раз в секунду
         last_inference_time = current_time
         results = model(cv2.resize(color_frame, (640, 640)))
 
