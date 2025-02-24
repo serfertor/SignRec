@@ -14,7 +14,7 @@ print(f"Подключено устройство: {device_info.get_name()}")
 
 # Настройка потока цветного изображения на 30 FPS
 config = Config()
-color_profiles = pipeline.get_stream_profile_list(OBSensorType.COLOR_SENSOR).get_video_stream_profiles()
+color_profiles = pipeline.get_stream_profile_list(OBSensorType.COLOR_SENSOR).get_video_stream_profile()
 
 # Выбираем профиль с максимальным FPS
 color_profile = max(color_profiles, key=lambda p: p.get_fps())
