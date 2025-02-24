@@ -127,7 +127,9 @@ def detect_and_track(color_frame, depth_frame):
 
 
 def get_frames():
+    print("⏳ Ожидание кадров от камеры...")
     frames: FrameSet = pipeline.wait_for_frames(300)
+    print("✅ Кадры получены!")
     if frames is None:
         return None, None
 
@@ -152,8 +154,12 @@ def visualize_depth(depth_frame):
 
 
 while True:
+    print("⏳ Запрашиваем кадры...")
     color_frame, depth_frame = get_frames()
+    print("✅ Кадры получены!")
+
     if color_frame is None or depth_frame is None:
+        print("⚠️ Кадры не получены, продолжаем ожидание...")
         continue
 
     processed_frame = detect_and_track(color_frame, depth_frame)
@@ -162,7 +168,7 @@ while True:
     combined_view = np.hstack((processed_frame, depth_colormap))
 
     cv2.imshow('Sign Recognition', combined_view)
-
+    cv2.waitKey(100)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         pipeline.stop()
         cv2.destroyAllWindows()
