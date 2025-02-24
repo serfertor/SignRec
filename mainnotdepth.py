@@ -18,14 +18,11 @@ config = Config()
 color_profile = pipeline.get_stream_profile_list(OBSensorType.COLOR_SENSOR).get_default_video_stream_profile()
 config.enable_stream(color_profile)
 
-# Ограничиваем размер очереди кадров
-pipeline.set_frameset_queue_size(1)
-
 # Запускаем поток
 pipeline.start(config)
 
 while True:
-    frames = pipeline.wait_for_frames(100)  # Ожидание кадров (таймаут 100 мс)
+    frames = pipeline.wait_for_frames(300)  # Ожидание кадров (таймаут 100 мс)
     if frames is None:
         print("Ошибка: Не получены кадры")
         continue
