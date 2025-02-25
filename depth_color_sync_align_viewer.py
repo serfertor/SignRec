@@ -1,12 +1,12 @@
 # ******************************************************************************
 #  Copyright (c) 2023 Orbbec 3D Technology, Inc
-#  
+#
 #  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.  
+#  you may not use this file except in compliance with the License.
 #  You may obtain a copy of the License at
-#  
+#
 #      http:# www.apache.org/licenses/LICENSE-2.0
-#  
+#
 #  Unless required by applicable law or agreed to in writing, software
 #  distributed under the License is distributed on an "AS IS" BASIS,
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,7 +15,7 @@
 # ******************************************************************************
 import argparse
 import sys
-
+from ultralytics import YOLO
 import cv2
 import numpy as np
 
@@ -26,6 +26,7 @@ ESC_KEY = 27
 
 
 def main(argv):
+    model = YOLO("weights/bestn_rknn_model/bestn_rknn_model")
     pipeline = Pipeline()
     device = pipeline.get_device()
     device_info = device.get_device_info()
@@ -92,6 +93,13 @@ def main(argv):
             if color_image is None:
                 print("failed to convert frame to image")
                 continue
+            results = model(cv2.resize(color_image, (640, 640)))[0]
+
+            x1, y1, x2, y2 = map(int, results[0].box.xyxy[0])
+
+            cv2.rectangle(color_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(color_image, "Tracking", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
             depth_frame = frames.get_depth_frame()
             if depth_frame is None:
                 continue
@@ -106,7 +114,9 @@ def main(argv):
             depth_image = cv2.applyColorMap(depth_image, cv2.COLORMAP_JET)
             # overlay color image on depth image
             depth_image = cv2.addWeighted(color_image, 0.5, depth_image, 0.5, 0)
-            cv2.imshow("SyncAlignViewer ", depth_image)
+
+            combined_view = np.hstack((color_image, depth_image))
+            cv2.imshow("SyncAlignViewer ", combined_view)
             key = cv2.waitKey(1)
             if key == ord('q') or key == ESC_KEY:
                 break

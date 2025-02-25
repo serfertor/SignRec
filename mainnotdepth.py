@@ -1,53 +1,108 @@
+import argparse
+import sys
+
 import cv2
 import numpy as np
-import pyorbbecsdk
-from pyorbbecsdk import Pipeline, Config, OBSensorType
+
+from pyorbbecsdk import *
 from utils import frame_to_bgr_image
-import time
 
-# Создаём объект пайплайна
-pipeline = Pipeline()
+ESC_KEY = 27
 
-# Получаем устройство и его информацию
-device = pipeline.get_device()
-device_info = device.get_device_info()
-print(f"Подключено устройство: {device_info.get_name()}")
 
-# Конфигурируем поток цветного изображения
-config = Config()
-color_profile = pipeline.get_stream_profile_list(OBSensorType.COLOR_SENSOR).get_default_video_stream_profile()
-config.enable_stream(color_profile)
+def main(argv):
+    pipeline = Pipeline()
+    device = pipeline.get_device()
+    device_info = device.get_device_info()
+    device_pid = device_info.get_pid()
+    config = Config()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-m", "--mode",
+                        help="align mode, HW=hardware mode,SW=software mode,NONE=disable align",
+                        type=str, default='HW')
+    parser.add_argument("-s", "--enable_sync", help="enable sync", type=bool, default=True)
+    args = parser.parse_args()
+    align_mode = args.mode
+    enable_sync = args.enable_sync
+    try:
+        profile_list = pipeline.get_stream_profile_list(OBSensorType.COLOR_SENSOR)
+        color_profile = profile_list.get_default_video_stream_profile()
+        config.enable_stream(color_profile)
+        profile_list = pipeline.get_stream_profile_list(OBSensorType.DEPTH_SENSOR)
+        assert profile_list is not None
+        depth_profile = profile_list.get_default_video_stream_profile()
+        assert depth_profile is not None
+        print("color profile : {}x{}@{}_{}".format(color_profile.get_width(),
+                                                   color_profile.get_height(),
+                                                   color_profile.get_fps(),
+                                                   color_profile.get_format()))
+        print("depth profile : {}x{}@{}_{}".format(depth_profile.get_width(),
+                                                   depth_profile.get_height(),
+                                                   depth_profile.get_fps(),
+                                                   depth_profile.get_format()))
+        config.enable_stream(depth_profile)
+    except Exception as e:
+        print(e)
+        return
+    if align_mode == 'HW':
+        if device_pid == 0x066B:
+            # Femto Mega does not support hardware D2C, and it is changed to software D2C
+            config.set_align_mode(OBAlignMode.SW_MODE)
+        else:
+            config.set_align_mode(OBAlignMode.HW_MODE)
+    elif align_mode == 'SW':
+        config.set_align_mode(OBAlignMode.SW_MODE)
+    else:
+        config.set_align_mode(OBAlignMode.DISABLE)
+    if enable_sync:
+        try:
+            pipeline.enable_frame_sync()
+        except Exception as e:
+            print(e)
+    try:
+        pipeline.start(config)
+    except Exception as e:
+        print(e)
+        return
+    while True:
+        try:
+            frames: FrameSet = pipeline.wait_for_frames(100)
+            if frames is None:
+                continue
+            color_frame = frames.get_color_frame()
+            if color_frame is None:
+                continue
+            # covert to RGB format
+            color_image = frame_to_bgr_image(color_frame)
+            if color_image is None:
+                print("failed to convert frame to image")
+                continue
+            depth_frame = frames.get_depth_frame()
+            if depth_frame is None:
+                continue
 
-# Запускаем поток
-pipeline.start(config)
+            width = depth_frame.get_width()
+            height = depth_frame.get_height()
+            scale = depth_frame.get_depth_scale()
 
-while True:
-    frames = pipeline.wait_for_frames(300)  # Ожидание кадров (таймаут 100 мс)
-    if frames is None:
-        print("Ошибка: Не получены кадры")
-        continue
 
-    color_frame = frames.get_color_frame()
-    if color_frame is None:
-        print("Ошибка: Нет цветного кадра")
-        continue
 
-    # Конвертация кадра в OpenCV формат (BGR)
-    color_image = frame_to_bgr_image(color_frame)
+            depth_data = (np.frombuffer(depth_frame.get_data().copy(order='C'), dtype=np.uint16).copy(order='C')
+                          .reshape((depth_frame.get_height(), depth_frame.get_width())))
+            depth_image = cv2.normalize(depth_data, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+            depth_image = cv2.applyColorMap(depth_image, cv2.COLORMAP_JET)
+            # overlay color image on depth image
+            depth_image = cv2.addWeighted(color_image, 0.5, depth_image, 0.5, 0)
+            cv2.imshow("SyncAlignViewer ", depth_image)
+            key = cv2.waitKey(1)
+            if key == ord('q') or key == ESC_KEY:
+                break
+        except KeyboardInterrupt:
+            break
+    pipeline.stop()
 
-    # Отображение кадра
-    cv2.imshow("Color Frame", color_image)
 
-    # Явно освобождаем переменные с кадрами
-    del color_frame
-    del frames
-
-    # Добавляем небольшую задержку для снижения нагрузки
-    time.sleep(0.01)
-
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-# Остановка пайплайна и закрытие окна
-pipeline.stop()
-cv2.destroyAllWindows()
+if __name__ == "__main__":
+    print("Please NOTE: This example is NOT supported by the Gemini 330 series.")
+    print("If you want to see the example on Gemini 330 series, please refer to align_filter_viewer.py")
+    main(sys.argv[1:])
