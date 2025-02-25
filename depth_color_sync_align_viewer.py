@@ -94,10 +94,10 @@ def main(argv):
                 print("failed to convert frame to image")
                 continue
 
-            results = model(cv2.resize(color_image, (640, 640)))[0]
+            results = model(cv2.resize(color_image, (640, 640)))
 
             if results is not None:
-                x1, y1, x2, y2 = map(int, results[0].box.xyxy[0])
+                x1, y1, x2, y2 = map(int, results[0].boxes[0].xyxy[0])
 
                 cv2.rectangle(color_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.putText(color_image, "Tracking", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
