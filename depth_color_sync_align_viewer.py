@@ -100,9 +100,8 @@ def main(argv):
             height = depth_frame.get_height()
             scale = depth_frame.get_depth_scale()
 
-            depth_data = np.frombuffer(depth_frame.get_data(), dtype=np.uint16)
-            depth_data = depth_data.reshape((height, width))
-            depth_data = depth_data.astype(np.float32) * scale
+            depth_data = (np.frombuffer(depth_frame.get_data().copy(order='C'), dtype=np.uint16).copy(order='C')
+                          .reshape((depth_frame.get_height(), depth_frame.get_width())))
             depth_image = cv2.normalize(depth_data, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
             depth_image = cv2.applyColorMap(depth_image, cv2.COLORMAP_JET)
             # overlay color image on depth image
