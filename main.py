@@ -73,11 +73,24 @@ def process_detections(detections, image):
 
 
 def process_depth_frame(depth_frame):
-    """ Обрабатывает кадр глубины и конвертирует в изображение. """
-    depth_data = np.asarray(depth_frame, dtype=np.uint16)
-    depth_normalized = cv2.normalize(depth_data, None, 0, 255, cv2.NORM_MINMAX)
-    depth_image = np.uint8(depth_normalized)
-    depth_image = cv2.applyColorMap(depth_image, cv2.COLORMAP_JET)  # Цветная карта глубины
+    """ Обрабатывает кадр глубины и создаёт визуализацию. """
+    width = depth_frame.get_width()
+    height = depth_frame.get_height()
+    scale = depth_frame.get_depth_scale()
+
+    # Получаем данные глубины в виде массива
+    depth_data = np.frombuffer(depth_frame.get_data(), dtype=np.uint16)
+    depth_data = depth_data.reshape((height, width))
+
+    # Приведение глубины к диапазону (мин/макс)
+    depth_data = depth_data.astype(np.float32) * scale
+    depth_data = np.where((depth_data > MIN_DEPTH) & (depth_data < MAX_DEPTH), depth_data, 0)
+    depth_data = depth_data.astype(np.uint16)
+
+    # Применяем нормализацию для визуализации
+    depth_image = cv2.normalize(depth_data, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+    depth_image = cv2.applyColorMap(depth_image, cv2.COLORMAP_JET)
+
     return depth_image
 
 
