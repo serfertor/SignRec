@@ -16,6 +16,13 @@ GESTURE_CLASSES = [
     "ok", "paper", "rock", "scissors", "up"
 ]
 
+# ID жестов
+TRIGGER_GESTURE = 5  # "jumbo" – фиксируем руку
+UNLOCK_GESTURE = 4  # "heart" – снимаем лок
+
+# Данные отслеживаемой руки
+tracked_hand = None  # (x1, y1, x2, y2, gesture_id)
+
 
 def load_rknn_model():
     """ Загружает RKNN-модель YOLO. """
@@ -25,8 +32,13 @@ def load_rknn_model():
 
 def process_detections(detections, image):
     """ Обрабатывает выходные данные YOLO и рисует боксы. """
+    global tracked_hand
+
     if not detections:
         return image
+
+    new_tracked_hand = None
+
     for det in detections[0].boxes:
         x1, y1, x2, y2 = map(int, det.xyxy[0])  # Координаты бокса
         conf = det.conf[0].item()  # Вероятность детекции
@@ -34,8 +46,34 @@ def process_detections(detections, image):
 
         label = f"{GESTURE_CLASSES[cls]}: {conf:.2f}"
         color = (0, 255, 0)  # Зеленый цвет для боксов
+
+        # Если уже отслеживаем руку, проверяем, относится ли это детекция к ней
+        if tracked_hand:
+            tx1, ty1, tx2, ty2, t_cls = tracked_hand
+
+            # Если показан жест "rock", сбрасываем отслеживание
+            if cls == UNLOCK_GESTURE:
+                print("Unlocking hand tracking...")
+                tracked_hand = None
+                continue
+
+            # Проверяем, что текущая рука находится рядом с отслеживаемой
+            if abs(x1 - tx1) < 50 and abs(y1 - ty1) < 50:
+                new_tracked_hand = (x1, y1, x2, y2, cls)
+                color = (0, 0, 255)  # Красный цвет для отслеживаемой руки
+
+        # Если триггер-жест (OK) и рука ещё не зафиксирована — фиксируем
+        elif cls == TRIGGER_GESTURE:
+            print("Hand locked for tracking!")
+            tracked_hand = (x1, y1, x2, y2, cls)
+            color = (0, 0, 255)  # Красный цвет для отслеживаемой руки
+
         cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
         cv2.putText(image, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+    # Обновляем отслеживаемую руку
+    if new_tracked_hand:
+        tracked_hand = new_tracked_hand
 
     return image
 
@@ -90,6 +128,7 @@ def main(argv):
     rknn = load_rknn_model()
     last_infer_time = time.time()
     detections = []
+
     while True:
         try:
             frames: FrameSet = pipeline.wait_for_frames(100)
