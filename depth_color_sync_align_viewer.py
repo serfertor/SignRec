@@ -96,9 +96,22 @@ def main(argv):
 
             results = model(cv2.resize(color_image, (640, 640)))
 
-            if results is not None:
-                x1, y1, x2, y2 = map(int, results[0].boxes[0].xyxy[0])
+            hands = []
 
+            for result in results:
+                for box in result.boxes:
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    label = model.names[int(box.cls)]
+                    conf = float(box.conf)
+
+                    hands.append({
+                        "bbox": (x1, y1, x2, y2),
+                        "label": label,
+                        "confidence": conf
+                    })
+
+            if hands:
+                x1, y1, x2, y2 = map(int, hands[0]["bbox"])
                 cv2.rectangle(color_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.putText(color_image, "Tracking", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
