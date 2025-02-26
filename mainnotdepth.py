@@ -1,6 +1,7 @@
 import argparse
 import sys
 import time
+
 import cv2
 import numpy as np
 from pyorbbecsdk import *
@@ -9,30 +10,30 @@ from ultralytics import YOLO
 
 ESC_KEY = 27
 
+# Список классов жестов
+GESTURE_CLASSES = [
+    "bad", "down", "goat", "good", "heart", "jumbo",
+    "ok", "paper", "rock", "scissors", "up"
+]
+
 
 def load_rknn_model():
-    return YOLO("weights/bestn_rknn_model/bestn_rknn_model")
+    """ Загружает RKNN-модель YOLO. """
+    rknn = YOLO("weights/bestn_rknn_model/bestn_rknn_model")
+    return rknn
 
 
-def run_inference(rknn, image):
-    input_data = cv2.resize(image, (640, 640))  # Размер входа для модели
-    detections = rknn(input_data)
-    return detections  # Вернём сырые выходные данные
-
-
-def draw_detections(image, detections):
-    if not detections:
-        return image
-
+def process_detections(detections, image):
+    """ Обрабатывает выходные данные YOLO и рисует боксы. """
     for det in detections[0].boxes:
         x1, y1, x2, y2 = map(int, det.xyxy[0])  # Координаты бокса
-        conf = float(det.conf[0])  # Доверие
-        cls = int(det.cls[0])  # Класс
-        label = f"{detections[0].names[cls]}: {conf:.2f}"
+        conf = det.conf[0].item()  # Вероятность детекции
+        cls = int(det.cls[0].item())  # ID класса
 
-        # Рисуем бокс
-        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(image, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        label = f"{GESTURE_CLASSES[cls]}: {conf:.2f}"
+        color = (0, 255, 0)  # Зеленый цвет для боксов
+        cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
+        cv2.putText(image, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
     return image
 
@@ -86,7 +87,6 @@ def main(argv):
 
     rknn = load_rknn_model()
     last_infer_time = time.time()
-    detections = []
 
     while True:
         try:
@@ -109,12 +109,9 @@ def main(argv):
 
             # Инференс раз в секунду
             if time.time() - last_infer_time > 1:
-                detections = run_inference(rknn, color_image)
+                detections = rknn(color_image)
+                color_image = process_detections(detections, color_image)
                 last_infer_time = time.time()
-                print("Detections:", detections)
-
-            # Отрисовка детекций
-            color_image = draw_detections(color_image, detections)
 
             cv2.imshow("YOLO Output", color_image)
             key = cv2.waitKey(1)
