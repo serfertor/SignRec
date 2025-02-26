@@ -1,178 +1,171 @@
+import argparse
+import sys
+import time
+
 import cv2
 import numpy as np
-import time
-import argparse
-import pyorbbecsdk
-from pyorbbecsdk import Pipeline, Config, OBSensorType, OBAlignMode, FrameSet
-from ultralytics import YOLO
+from pyorbbecsdk import *
 from utils import frame_to_bgr_image
+from ultralytics import YOLO
 
-pipeline = Pipeline()
-device = pipeline.get_device()
-device_info = device.get_device_info()
-device_pid = device_info.get_pid()
-config = Config()
+ESC_KEY = 27
 
-color_profile = pipeline.get_stream_profile_list(OBSensorType.COLOR_SENSOR).get_default_video_stream_profile()
-config.enable_stream(color_profile)
+# Список классов жестов
+GESTURE_CLASSES = [
+    "bad", "down", "goat", "good", "heart", "jumbo",
+    "ok", "paper", "rock", "scissors", "up"
+]
 
-depth_profile = pipeline.get_stream_profile_list(OBSensorType.DEPTH_SENSOR).get_default_video_stream_profile()
-config.enable_stream(depth_profile)
-
-print(f"Color profile: {color_profile.get_width()}x{color_profile.get_height()} @ {color_profile.get_fps()} FPS")
-print(f"Depth profile: {depth_profile.get_width()}x{depth_profile.get_height()} @ {depth_profile.get_fps()} FPS")
-
-config.set_align_mode(OBAlignMode.HW_MODE)
-#pipeline.enable_frame_sync()
-pipeline.disable_frame_sync()
-pipeline.start(config)
-
-time.sleep(2)
-
-model = YOLO("weights/bestn_rknn_model/bestn_rknn_model")  #bestn (nano) или best (small)
-
-TRIGGER_GESTURE = "jumbo"
-RESET_GESTURE = "heart"
-tracked_hand = None
-tracked_trajectory = []
-last_inference_time = 0  # Таймер для инференса 1 кадр в секунду
-max_miss_frames = 60  # Количество кадров для сброса трека
-missed_frames = 0  # Счётчик пропущенных кадров
-last_tracked_bbox = None  # Последний бокс руки
-last_tracked_trajectory = []  # Последняя траектория движения
+# Параметры отслеживания
+TRIGGER_GESTURE = "jumbo"  # Жест для фиксации руки
+UNLOCK_GESTURE = "heart"  # Жест для сброса отслеживания
+TRACKING_RADIUS = 100  # Радиус области отслеживания
 
 
-def detect_and_track(color_frame, depth_frame):
-    global tracked_hand, tracked_trajectory, last_inference_time, missed_frames, last_tracked_bbox, last_tracked_trajectory
-
-    current_time = time.time()
-    if current_time - last_inference_time >= 5:  # Инференс раз в секунду
-        last_inference_time = current_time
-        results = model(cv2.resize(color_frame, (640, 640)))
-
-        hands = []
-        for result in results:
-            for box in result.boxes:
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                label = model.names[int(box.cls)]
-                conf = float(box.conf)
-
-                hands.append({
-                    "bbox": (x1, y1, x2, y2),
-                    "label": label,
-                    "confidence": conf
-                })
-
-        if tracked_hand is None:
-            for hand in hands:
-                if hand["label"] == TRIGGER_GESTURE:
-                    x1, y1, x2, y2 = hand["bbox"]
-                    depth_value = depth_frame[y1:y2, x1:x2].mean()
-                    tracked_hand = {"bbox": hand["bbox"], "depth": depth_value}
-                    tracked_trajectory = []
-                    missed_frames = 0
-                    last_tracked_bbox = hand["bbox"]  # Кэшируем бокс
-                    last_tracked_trajectory = []  # Очищаем траекторию
-                    print(
-                        f"✅ Захвачена рука с жестом {TRIGGER_GESTURE} - Координаты: {x1, y1, x2, y2}, Глубина: {depth_value:.2f}")
-                    break
-        else:
-            # Поиск самой близкой руки к сохранённой глубине
-            closest_hand = None
-            min_depth_diff = float("inf")
-
-            for hand in hands:
-                x1, y1, x2, y2 = hand["bbox"]
-                depth_value = depth_frame[y1:y2, x1:x2].mean()
-
-                depth_diff = abs(depth_value - tracked_hand["depth"])
-                if depth_diff < min_depth_diff:
-                    min_depth_diff = depth_diff
-                    closest_hand = hand
-
-            if closest_hand and min_depth_diff < 400 and closest_hand["label"] != RESET_GESTURE:
-                tracked_hand["bbox"] = closest_hand["bbox"]
-                tracked_hand["depth"] = depth_frame[closest_hand["bbox"][1]:closest_hand["bbox"][3],
-                                        closest_hand["bbox"][0]:closest_hand["bbox"][2]].mean()
-                x1, y1, x2, y2 = tracked_hand["bbox"]
-                tracked_trajectory.append(((x1 + x2) // 2, (y1 + y2) // 2))
-                missed_frames = 0
-
-                last_tracked_bbox = tracked_hand["bbox"]  # Кэшируем бокс
-                last_tracked_trajectory = tracked_trajectory  # Кэшируем траекторию
-
-                print(f"🔵 Отслеживаем руку - Координаты: {x1, y1, x2, y2}, Глубина: {tracked_hand['depth']:.2f}")
-                '''
-                здесь можно прописать кейсы использовангия жестов
-                '''
-
-            else:
-                missed_frames += 1
-                if missed_frames > max_miss_frames or closest_hand["label"] != RESET_GESTURE:
-                    print("❌ Рука потеряна, сбрасываем трек")
-                    tracked_hand = None
-                    tracked_trajectory = []
-                    last_tracked_bbox = None
-                    last_tracked_trajectory = []
-
-    if last_tracked_bbox:
-        x1, y1, x2, y2 = last_tracked_bbox
-        cv2.rectangle(color_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        cv2.putText(color_frame, "Tracking", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-
-    for i in range(1, len(last_tracked_trajectory)):
-        cv2.line(color_frame, last_tracked_trajectory[i - 1], last_tracked_trajectory[i], (0, 0, 255), 2)
-
-    return color_frame
+def load_rknn_model():
+    """ Загружает RKNN-модель YOLO. """
+    rknn = YOLO("weights/bestn_rknn_model/bestn_rknn_model")
+    return rknn
 
 
-def get_frames():
-    print("⏳ Ожидание кадров от камеры...")
-    frames: FrameSet = pipeline.wait_for_frames(300)
-    print("✅ Кадры получены!")
-    if frames is None:
-        return None, None
+def process_detections(detections, image, tracking_point):
+    """ Обрабатывает детекции: рисует боксы и проверяет попадание в область отслеживания. """
+    if not detections:
+        return image, None, None
 
-    color_frame = frames.get_color_frame()
-    if color_frame is None:
-        return None, None
-    color_image = frame_to_bgr_image(color_frame)
+    new_tracking_point = None
+    new_tracking_class = None
 
-    depth_frame = frames.get_depth_frame()
-    if depth_frame is None:
-        return None, None
-    depth_data = (np.frombuffer(depth_frame.get_data().copy(order='C'), dtype=np.uint16).copy(order='C')
-                  .reshape((depth_frame.get_height(), depth_frame.get_width())))
+    for det in detections[0].boxes:
+        x1, y1, x2, y2 = map(int, det.xyxy[0])  # Координаты бокса
+        conf = det.conf[0].item()  # Вероятность детекции
+        cls = int(det.cls[0].item())  # ID класса
+        label = f"{GESTURE_CLASSES[cls]}: {conf:.2f}"
+        color = (0, 255, 0)  # Зеленый цвет для боксов
 
-    return color_image, depth_data
+        # Вычисляем центр бокса
+        center_x = (x1 + x2) // 2
+        center_y = (y1 + y2) // 2
+
+        # Проверяем, попадает ли бокс в область отслеживания
+        if tracking_point:
+            dist = np.sqrt((center_x - tracking_point[0]) ** 2 + (center_y - tracking_point[1]) ** 2)
+            if dist <= TRACKING_RADIUS:
+                new_tracking_point = (center_x, center_y)
+                new_tracking_class = GESTURE_CLASSES[cls]
+                color = (255, 0, 0)  # Отмечаем отслеживаемую руку синим
+
+        cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
+        cv2.putText(image, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+        # Если триггер-жест, фиксируем руку
+        if GESTURE_CLASSES[cls] == TRIGGER_GESTURE:
+            new_tracking_point = (center_x, center_y)
+            new_tracking_class = GESTURE_CLASSES[cls]
+
+    return image, new_tracking_point, new_tracking_class
 
 
-def visualize_depth(depth_frame):
-    depth_normalized = cv2.normalize(depth_frame, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-    depth_colormap = cv2.applyColorMap(depth_normalized, cv2.COLORMAP_JET)
-    return depth_colormap
+def main(argv):
+    pipeline = Pipeline()
+    device = pipeline.get_device()
+    device_info = device.get_device_info()
+    device_pid = device_info.get_pid()
+    config = Config()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-m", "--mode", help="align mode, HW=hardware mode,SW=software mode,NONE=disable align",
+                        type=str, default='HW')
+    parser.add_argument("-s", "--enable_sync", help="enable sync", type=bool, default=True)
+    args = parser.parse_args()
+
+    align_mode = args.mode
+    enable_sync = args.enable_sync
+
+    try:
+        profile_list = pipeline.get_stream_profile_list(OBSensorType.COLOR_SENSOR)
+        color_profile = profile_list.get_default_video_stream_profile()
+        config.enable_stream(color_profile)
+
+        profile_list = pipeline.get_stream_profile_list(OBSensorType.DEPTH_SENSOR)
+        depth_profile = profile_list.get_default_video_stream_profile()
+        config.enable_stream(depth_profile)
+    except Exception as e:
+        print(e)
+        return
+
+    if align_mode == 'HW':
+        config.set_align_mode(OBAlignMode.HW_MODE)
+    elif align_mode == 'SW':
+        config.set_align_mode(OBAlignMode.SW_MODE)
+    else:
+        config.set_align_mode(OBAlignMode.DISABLE)
+
+    if enable_sync:
+        try:
+            pipeline.enable_frame_sync()
+        except Exception as e:
+            print(e)
+
+    try:
+        pipeline.start(config)
+    except Exception as e:
+        print(e)
+        return
+
+    rknn = load_rknn_model()
+    last_infer_time = time.time()
+    tracking_point = None  # Точка центра отслеживаемой руки
+    tracking_class = None  # Последний распознанный жест отслеживаемой руки
+    detection = []
+    while True:
+        try:
+            frames: FrameSet = pipeline.wait_for_frames(100)
+            if frames is None:
+                continue
+
+            color_frame = frames.get_color_frame()
+            if color_frame is None:
+                continue
+
+            color_image = frame_to_bgr_image(color_frame)
+            if color_image is None:
+                print("failed to convert frame to image")
+                continue
+
+            depth_frame = frames.get_depth_frame()
+            if depth_frame is None:
+                continue
+
+            # Инференс раз в секунду
+            if time.time() - last_infer_time > 1:
+                detections = rknn(color_image)
+                last_infer_time = time.time()
+
+                # Обработка детекций и обновление точки отслеживания
+                color_image, new_tracking_point, new_tracking_class = process_detections(detections, color_image,
+                                                                                         tracking_point)
+
+                # Если получен триггер-жест, фиксируем руку
+                if new_tracking_class == TRIGGER_GESTURE:
+                    tracking_point = new_tracking_point
+                    print("Триггер-жест зафиксирован, отслеживаем руку")
+
+                # Если жест сброса — убираем отслеживание
+                if new_tracking_class == UNLOCK_GESTURE:
+                    tracking_point = None
+                    print("Отслеживание руки сброшено")
+
+            cv2.imshow("YOLO Tracking", color_image)
+            key = cv2.waitKey(1)
+            if key == ord('q') or key == ESC_KEY:
+                break
+
+        except KeyboardInterrupt:
+            break
+
+    pipeline.stop()
 
 
-while True:
-    print("⏳ Запрашиваем кадры...")
-    color_frame, depth_frame = get_frames()
-    print("✅ Кадры получены!")
-
-    if color_frame is None or depth_frame is None:
-        print("⚠️ Кадры не получены, продолжаем ожидание...")
-        continue
-
-    processed_frame = detect_and_track(color_frame, depth_frame)
-    depth_colormap = visualize_depth(depth_frame)
-
-    combined_view = np.hstack((processed_frame, depth_colormap))
-
-    cv2.imshow('Sign Recognition', combined_view)
-    cv2.waitKey(100)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        pipeline.stop()
-        cv2.destroyAllWindows()
-        break
-
-pipeline.stop()
-cv2.destroyAllWindows()
+if __name__ == "__main__":
+    main(sys.argv[1:])
