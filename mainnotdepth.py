@@ -86,6 +86,7 @@ def main(argv):
 
     rknn = load_rknn_model()
     last_infer_time = time.time()
+    detections = []
 
     while True:
         try:
