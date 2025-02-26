@@ -17,8 +17,8 @@ GESTURE_CLASSES = [
 ]
 
 # Параметры отслеживания
-TRIGGER_GESTURE = "ok"  # Жест для фиксации руки
-UNLOCK_GESTURE = "down"  # Жест для сброса отслеживания
+TRIGGER_GESTURE = "jumbo"  # Жест для фиксации руки
+UNLOCK_GESTURE = "heart"  # Жест для сброса отслеживания
 TRACKING_RADIUS = 100  # Радиус области отслеживания
 
 
