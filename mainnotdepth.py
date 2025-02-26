@@ -16,12 +16,10 @@ GESTURE_CLASSES = [
     "ok", "paper", "rock", "scissors", "up"
 ]
 
-# ID жестов
-TRIGGER_GESTURE = 5  # "jumbo" – фиксируем руку
-UNLOCK_GESTURE = 4  # "heart" – снимаем лок
-
-# Данные отслеживаемой руки
-tracked_hand = None  # (x1, y1, x2, y2, gesture_id)
+# Параметры отслеживания
+TRIGGER_GESTURE = "ok"  # Жест для фиксации руки
+UNLOCK_GESTURE = "down"  # Жест для сброса отслеживания
+TRACKING_RADIUS = 100  # Радиус области отслеживания
 
 
 def load_rknn_model():
@@ -30,52 +28,42 @@ def load_rknn_model():
     return rknn
 
 
-def process_detections(detections, image):
-    """ Обрабатывает выходные данные YOLO и рисует боксы. """
-    global tracked_hand
-
+def process_detections(detections, image, tracking_point):
+    """ Обрабатывает детекции: рисует боксы и проверяет попадание в область отслеживания. """
     if not detections:
-        return image
+        return image, None, None
 
-    new_tracked_hand = None
+    new_tracking_point = None
+    new_tracking_class = None
 
     for det in detections[0].boxes:
         x1, y1, x2, y2 = map(int, det.xyxy[0])  # Координаты бокса
         conf = det.conf[0].item()  # Вероятность детекции
         cls = int(det.cls[0].item())  # ID класса
-
         label = f"{GESTURE_CLASSES[cls]}: {conf:.2f}"
         color = (0, 255, 0)  # Зеленый цвет для боксов
 
-        # Если уже отслеживаем руку, проверяем, относится ли это детекция к ней
-        if tracked_hand:
-            tx1, ty1, tx2, ty2, t_cls = tracked_hand
+        # Вычисляем центр бокса
+        center_x = (x1 + x2) // 2
+        center_y = (y1 + y2) // 2
 
-            # Если показан жест "rock", сбрасываем отслеживание
-            if cls == UNLOCK_GESTURE:
-                print("Unlocking hand tracking...")
-                tracked_hand = None
-                continue
-
-            # Проверяем, что текущая рука находится рядом с отслеживаемой
-            if abs(x1 - tx1) < 50 and abs(y1 - ty1) < 50:
-                new_tracked_hand = (x1, y1, x2, y2, cls)
-                color = (0, 0, 255)  # Красный цвет для отслеживаемой руки
-
-        # Если триггер-жест (OK) и рука ещё не зафиксирована — фиксируем
-        elif cls == TRIGGER_GESTURE:
-            print("Hand locked for tracking!")
-            tracked_hand = (x1, y1, x2, y2, cls)
-            color = (0, 0, 255)  # Красный цвет для отслеживаемой руки
+        # Проверяем, попадает ли бокс в область отслеживания
+        if tracking_point:
+            dist = np.sqrt((center_x - tracking_point[0]) ** 2 + (center_y - tracking_point[1]) ** 2)
+            if dist <= TRACKING_RADIUS:
+                new_tracking_point = (center_x, center_y)
+                new_tracking_class = GESTURE_CLASSES[cls]
+                color = (255, 0, 0)  # Отмечаем отслеживаемую руку синим
 
         cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
         cv2.putText(image, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
-    # Обновляем отслеживаемую руку
-    if new_tracked_hand:
-        tracked_hand = new_tracked_hand
+        # Если триггер-жест, фиксируем руку
+        if GESTURE_CLASSES[cls] == TRIGGER_GESTURE:
+            new_tracking_point = (center_x, center_y)
+            new_tracking_class = GESTURE_CLASSES[cls]
 
-    return image
+    return image, new_tracking_point, new_tracking_class
 
 
 def main(argv):
@@ -127,7 +115,8 @@ def main(argv):
 
     rknn = load_rknn_model()
     last_infer_time = time.time()
-    detections = []
+    tracking_point = None  # Точка центра отслеживаемой руки
+    tracking_class = None  # Последний распознанный жест отслеживаемой руки
 
     while True:
         try:
@@ -153,9 +142,21 @@ def main(argv):
                 detections = rknn(color_image)
                 last_infer_time = time.time()
 
-            color_image = process_detections(detections, color_image)
+                # Обработка детекций и обновление точки отслеживания
+                color_image, new_tracking_point, new_tracking_class = process_detections(detections, color_image,
+                                                                                         tracking_point)
 
-            cv2.imshow("YOLO Output", color_image)
+                # Если получен триггер-жест, фиксируем руку
+                if new_tracking_class == TRIGGER_GESTURE:
+                    tracking_point = new_tracking_point
+                    print("Триггер-жест зафиксирован, отслеживаем руку")
+
+                # Если жест сброса — убираем отслеживание
+                if new_tracking_class == UNLOCK_GESTURE:
+                    tracking_point = None
+                    print("Отслеживание руки сброшено")
+
+            cv2.imshow("YOLO Tracking", color_image)
             key = cv2.waitKey(1)
             if key == ord('q') or key == ESC_KEY:
                 break
