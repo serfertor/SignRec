@@ -1,7 +1,6 @@
 import argparse
 import sys
 import time
-
 import cv2
 import numpy as np
 from pyorbbecsdk import *
@@ -12,14 +11,30 @@ ESC_KEY = 27
 
 
 def load_rknn_model():
-    rknn = YOLO("weights/bestn_rknn_model/bestn_rknn_model")
-    return rknn
+    return YOLO("weights/bestn_rknn_model/bestn_rknn_model")
 
 
 def run_inference(rknn, image):
-    input_data = cv2.resize(image, (640, 640))  # Размер модели
-    outputs = rknn(input_data)
-    return outputs  # Вернёт сырые выходные данные, пока без обработки
+    input_data = cv2.resize(image, (640, 640))  # Размер входа для модели
+    detections = rknn(input_data)
+    return detections  # Вернём сырые выходные данные
+
+
+def draw_detections(image, detections):
+    if not detections:
+        return image
+
+    for det in detections[0].boxes:
+        x1, y1, x2, y2 = map(int, det.xyxy[0])  # Координаты бокса
+        conf = float(det.conf[0])  # Доверие
+        cls = int(det.cls[0])  # Класс
+        label = f"{detections[0].names[cls]}: {conf:.2f}"
+
+        # Рисуем бокс
+        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.putText(image, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+    return image
 
 
 def main(argv):
@@ -96,6 +111,9 @@ def main(argv):
                 detections = run_inference(rknn, color_image)
                 last_infer_time = time.time()
                 print("Detections:", detections)
+
+            # Отрисовка детекций
+            color_image = draw_detections(color_image, detections)
 
             cv2.imshow("YOLO Output", color_image)
             key = cv2.waitKey(1)
