@@ -22,6 +22,7 @@ UNLOCK_GESTURE = 4  # "heart" – снимаем лок
 
 # Данные отслеживаемой руки
 tracked_hand = None  # (x1, y1, x2, y2, gesture_id)
+DEPTH_THRESHOLD = 200  # Порог допустимой разницы глубины в мм
 
 
 def load_rknn_model():
@@ -30,8 +31,17 @@ def load_rknn_model():
     return rknn
 
 
-def process_detections(detections, image):
-    """ Обрабатывает выходные данные YOLO и рисует боксы. """
+def get_average_depth(depth_data, x1, y1, x2, y2):
+    """ Возвращает среднюю глубину внутри указанного бокса. """
+    region = depth_data[y1:y2, x1:x2]
+    nonzero_values = region[region > 0]  # Игнорируем нулевые значения
+    if len(nonzero_values) == 0:
+        return None
+    return int(np.mean(nonzero_values))  # Усредняем глубину
+
+
+def process_detections(detections, image, depth_data):
+    """ Обрабатывает выходные данные YOLO с учётом глубины. """
     global tracked_hand
 
     if not detections:
@@ -47,8 +57,17 @@ def process_detections(detections, image):
         label = f"{GESTURE_CLASSES[cls]}: {conf:.2f}"
         color = (0, 255, 0)  # Зеленый цвет для боксов
 
+        avg_depth = get_average_depth(depth_data, x1, y1, x2, y2)
+        if avg_depth is None:
+            continue
+
         if tracked_hand:
             tx1, ty1, tx2, ty2, t_cls = tracked_hand
+            tracked_depth = get_average_depth(depth_data, tx1, ty1, tx2, ty2)
+
+            if tracked_depth is None or abs(avg_depth - tracked_depth) > DEPTH_THRESHOLD:
+                continue  # Игнорируем, если жест далеко по глубине
+
             if cls == UNLOCK_GESTURE:
                 print("Unlocking hand tracking...")
                 tracked_hand = None
@@ -56,7 +75,7 @@ def process_detections(detections, image):
 
             if abs(x1 - tx1) < 50 and abs(y1 - ty1) < 50:
                 new_tracked_hand = (x1, y1, x2, y2, cls)
-                color = (0, 0, 255)  # Красный цвет для отслеживаемой руки
+                color = (0, 0, 255)
 
         elif cls == TRIGGER_GESTURE:
             print("Hand locked for tracking!")
