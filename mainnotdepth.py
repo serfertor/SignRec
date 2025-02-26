@@ -117,6 +117,7 @@ def main(argv):
     last_infer_time = time.time()
     tracking_point = None  # Точка центра отслеживаемой руки
     tracking_class = None  # Последний распознанный жест отслеживаемой руки
+    last_processed_image = None  # Последнее обработанное изображение
 
     while True:
         try:
@@ -137,14 +138,20 @@ def main(argv):
             if depth_frame is None:
                 continue
 
+            # Обновляем изображение перед отрисовкой
+            if last_processed_image is not None:
+                display_image = last_processed_image.copy()
+            else:
+                display_image = color_image.copy()
+
             # Инференс раз в секунду
             if time.time() - last_infer_time > 1:
                 detections = rknn(color_image)
                 last_infer_time = time.time()
 
                 # Обработка детекций и обновление точки отслеживания
-                color_image, new_tracking_point, new_tracking_class = process_detections(detections, color_image,
-                                                                                         tracking_point)
+                display_image, new_tracking_point, new_tracking_class = process_detections(detections, display_image,
+                                                                                           tracking_point)
 
                 # Если получен триггер-жест, фиксируем руку
                 if new_tracking_class == TRIGGER_GESTURE:
@@ -156,7 +163,10 @@ def main(argv):
                     tracking_point = None
                     print("Отслеживание руки сброшено")
 
-            cv2.imshow("YOLO Tracking", color_image)
+                # Сохраняем последнее обработанное изображение
+                last_processed_image = display_image.copy()
+
+            cv2.imshow("YOLO Tracking", display_image)
             key = cv2.waitKey(1)
             if key == ord('q') or key == ESC_KEY:
                 break
