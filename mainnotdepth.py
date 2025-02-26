@@ -25,6 +25,8 @@ def load_rknn_model():
 
 def process_detections(detections, image):
     """ Обрабатывает выходные данные YOLO и рисует боксы. """
+    if not detections:
+        return image
     for det in detections[0].boxes:
         x1, y1, x2, y2 = map(int, det.xyxy[0])  # Координаты бокса
         conf = det.conf[0].item()  # Вероятность детекции
