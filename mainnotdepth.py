@@ -87,7 +87,7 @@ def main(argv):
 
     rknn = load_rknn_model()
     last_infer_time = time.time()
-
+    detections = []
     while True:
         try:
             frames: FrameSet = pipeline.wait_for_frames(100)
@@ -110,8 +110,9 @@ def main(argv):
             # Инференс раз в секунду
             if time.time() - last_infer_time > 1:
                 detections = rknn(color_image)
-                color_image = process_detections(detections, color_image)
                 last_infer_time = time.time()
+
+            color_image = process_detections(detections, color_image)
 
             cv2.imshow("YOLO Output", color_image)
             key = cv2.waitKey(1)
