@@ -182,12 +182,16 @@ def main(argv):
             # Обрабатываем карту глубины
             depth_image = process_depth_frame(depth_frame)
 
+            # Получаем сырые данные глубины
+            depth_data = np.frombuffer(depth_frame.get_data(), dtype=np.uint16)
+            depth_data = depth_data.reshape((depth_frame.get_height(), depth_frame.get_width()))
+
             # Инференс раз в секунду
             if time.time() - last_infer_time > 1:
                 detections = rknn(color_image)
                 last_infer_time = time.time()
 
-            color_image = process_detections(detections, color_image)
+            color_image = process_detections(detections, color_image, depth_data)
 
             # Изменяем размер depth_image, чтобы он совпадал с color_image
             depth_resized = cv2.resize(depth_image, (color_image.shape[1], color_image.shape[0]))
