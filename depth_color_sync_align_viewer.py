@@ -82,7 +82,7 @@ def main(argv):
         return
     while True:
         try:
-            frames: FrameSet = pipeline.wait_for_frames(100)
+            frames: FrameSet = pipeline.wait_for_frames(500)
             if frames is None:
                 continue
             color_frame = frames.get_color_frame()
@@ -132,7 +132,7 @@ def main(argv):
 
             combined_view = np.hstack((color_image, depth_image))
             cv2.imshow("SyncAlignViewer ", combined_view)
-            key = cv2.waitKey(1)
+            key = cv2.waitKey(100)
             if key == ord('q') or key == ESC_KEY:
                 break
         except KeyboardInterrupt:
