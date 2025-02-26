@@ -81,10 +81,6 @@ def process_depth_frame(depth_frame):
     # Получаем данные глубины в виде массива
     depth_data = np.frombuffer(depth_frame.get_data(), dtype=np.uint16)
     depth_data = depth_data.reshape((height, width))
-
-    # Приведение глубины к диапазону (мин/макс)
-    depth_data = depth_data.astype(np.float32) * scale
-    depth_data = np.where((depth_data > MIN_DEPTH) & (depth_data < MAX_DEPTH), depth_data, 0)
     depth_data = depth_data.astype(np.uint16)
 
     # Применяем нормализацию для визуализации
