@@ -26,6 +26,68 @@ tracking_frames = 0  # Счётчик кадров для плавного ис�
 TRACKING_RADIUS = 100  # Радиус отслеживания
 
 
+def handle_bad():
+    print("Bad gesture detected - placeholder function")
+
+
+def handle_down():
+    print("Down gesture detected - placeholder function")
+
+
+def handle_goat():
+    print("Goat gesture detected - placeholder function")
+
+
+def handle_good():
+    print("Good gesture detected - placeholder function")
+
+
+def handle_heart():
+    print("Heart gesture detected - unlocking hand tracking")
+    global tracked_point, tracking_frames
+    tracked_point = None
+    tracking_frames = 0
+
+
+def handle_jumbo():
+    print("Jumbo gesture detected - locking hand tracking")
+
+
+def handle_ok():
+    print("OK gesture detected - placeholder function")
+
+
+def handle_paper():
+    print("Paper gesture detected - placeholder function")
+
+
+def handle_rock():
+    print("Rock gesture detected - placeholder function")
+
+
+def handle_scissors():
+    print("Scissors gesture detected - placeholder function")
+
+
+def handle_up():
+    print("Up gesture detected - placeholder function")
+
+
+GESTURE_HANDLERS = {
+    0: handle_bad,
+    1: handle_down,
+    2: handle_goat,
+    3: handle_good,
+    4: handle_heart,
+    5: handle_jumbo,
+    6: handle_ok,
+    7: handle_paper,
+    8: handle_rock,
+    9: handle_scissors,
+    10: handle_up,
+}
+
+
 def load_rknn_model():
     """ Загружает RKNN-модель YOLO. """
     rknn = YOLO("weights/bestn_rknn_model/bestn_rknn_model")
@@ -57,24 +119,21 @@ def process_detections(detections, image):
         if tracked_point:
             px, py = tracked_point
 
-            # Если найден жест снятия блока (heart) — сбрасываем отслеживание
-            if cls == UNLOCK_GESTURE:
-                print("Unlocking hand tracking...")
-                tracked_point = None
-                tracking_frames = 0
-                continue
-
             # Если рука в радиусе отслеживания — обновляем точку
             dist = np.sqrt((center_x - px) ** 2 + (center_y - py) ** 2)
             if dist <= TRACKING_RADIUS:
                 new_tracked_point = (center_x, center_y)
                 color = (0, 0, 255)  # Красный цвет для отслеживаемой руки
 
+            # Если найден жест — вызываем его обработчик
+            if cls in GESTURE_HANDLERS:
+                GESTURE_HANDLERS[cls]()
+
         # Если триггер-жест (jumbo) и нет отслеживаемой руки — фиксируем
         elif cls == TRIGGER_GESTURE:
             print("Hand locked for tracking!")
             tracked_point = (center_x, center_y)
-            tracking_frames = 10  # Устанавливаем таймер на 5 кадров
+            tracking_frames = 5  # Устанавливаем таймер на 5 кадров
             color = (0, 0, 255)  # Красный цвет для отслеживаемой руки
 
         cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
