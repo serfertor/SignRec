@@ -55,7 +55,8 @@ def process_detections(detections, image, depth_data):
         cls = int(det.cls[0].item())  # ID класса
 
         label = f"{GESTURE_CLASSES[cls]}: {conf:.2f}"
-        print("Detect ", label)
+        color = (0, 255, 0)  # Зеленый цвет для боксов
+
         avg_depth = get_average_depth(depth_data, x1, y1, x2, y2)
         if avg_depth is None:
             continue
@@ -79,6 +80,10 @@ def process_detections(detections, image, depth_data):
         elif cls == TRIGGER_GESTURE:
             print("Hand locked for tracking!")
             tracked_hand = (x1, y1, x2, y2, cls)
+            color = (0, 0, 255)
+
+        cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
+        cv2.putText(image, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
     if new_tracked_hand:
         tracked_hand = new_tracked_hand
@@ -187,6 +192,18 @@ def main(argv):
                 last_infer_time = time.time()
 
             color_image = process_detections(detections, color_image, depth_data)
+
+            # Изменяем размер depth_image, чтобы он совпадал с color_image
+            depth_resized = cv2.resize(depth_image, (color_image.shape[1], color_image.shape[0]))
+
+            # Объединяем изображения в одно
+            combined_image = np.hstack((color_image, depth_resized))
+
+            cv2.imshow("YOLO + Depth Map", combined_image)
+
+            key = cv2.waitKey(1)
+            if key == ord('q') or key == ESC_KEY:
+                break
 
         except KeyboardInterrupt:
             break
